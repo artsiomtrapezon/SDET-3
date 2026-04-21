@@ -5,6 +5,9 @@ export class PlaywrightDevPage {
   readonly getStartedLink: Locator;
   readonly installationHeader: Locator;
   readonly pomLink: Locator;
+  readonly navDocs: Locator;
+  readonly navAPI: Locator;
+  readonly navCommunity: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -13,6 +16,10 @@ export class PlaywrightDevPage {
     this.pomLink = page
       .locator('li', { hasText: 'Guides' })
       .locator('a', { hasText: 'Page Object Model' });
+    this.navDocs = page.getByRole('navigation').getByRole('link', { name: 'Docs' });
+    this.navAPI = page.getByRole('navigation').getByRole('link', { name: 'API' });
+    // Community is a footer section heading, not a top-nav link on the current site
+    this.navCommunity = page.locator('footer').getByText('Community', { exact: true });
   }
 
   async goto() {
