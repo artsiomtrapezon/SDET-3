@@ -16,7 +16,7 @@ export class PlaywrightDevPage {
     this.pomLink = page
       .locator('li', { hasText: 'Guides' })
       .locator('a', { hasText: 'Page Object Model' });
-    this.navDocs = page.getByRole('navigation').getByRole('link', { name: 'Docs' });
+    this.navDocs = page.getByRole('navigation').locator('#docs');
     this.navAPI = page.getByRole('navigation').getByRole('link', { name: 'API' });
     // Community is a footer section heading, not a top-nav link on the current site
     this.navCommunity = page.locator('footer').getByText('Community', { exact: true });

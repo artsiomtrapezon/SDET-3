@@ -6,7 +6,7 @@ import { PlaywrightDevPage } from '../pages/PlaywrightDevPage';
 // Note: on the current site Docs and API are top-nav links; Community is a
 // footer section heading (not a clickable nav button). Tests reflect this.
 
-test.describe('TC001 – Main page navigation buttons', () => {
+test.describe('TC001 - Main page navigation buttons', () => {
   test.beforeEach(async ({ page }) => {
     const playwrightDev = new PlaywrightDevPage(page);
     await playwrightDev.goto();
@@ -15,7 +15,7 @@ test.describe('TC001 – Main page navigation buttons', () => {
   // Steps 2-5: all three elements are visible on the page
   test('Docs and API links are visible in the top navigation bar', async ({ page }) => {
     const playwrightDev = new PlaywrightDevPage(page);
-
+    await page.waitForTimeout(2000);
     await expect(playwrightDev.navDocs).toBeVisible();
     await expect(playwrightDev.navAPI).toBeVisible();
   });
