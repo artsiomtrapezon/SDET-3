@@ -1,17 +1,19 @@
 name: Playwright Tests
 
-# Run on pull requests targeting the main branch only
+# Run on pull requests targeting main and on direct pushes to main
 on:
   pull_request:
+    branches: [ main ]
+  push:
     branches: [ main ]
 
 # Minimal read-only permissions
 permissions:
   contents: read
 
-# Cancel in-progress runs for the same PR to save resources
+# Cancel in-progress runs for the same PR or commit to save resources
 concurrency:
-  group: playwright-${{ github.event.pull_request.number }}
+  group: playwright-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -19,6 +21,15 @@ jobs:
     name: playwright-tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     env:
       CI: true
@@ -87,3 +98,96 @@ jobs:
                 }
               ]
             }'
+
+      # ── GitHub Pages publish (main only) ─────────────────────────────────────
+
+      # Fetch history.json from the gh-pages branch if it already exists
+      - name: Fetch previous run history from gh-pages
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+            git fetch origin gh-pages --depth=1
+            git show origin/gh-pages:history.json > /tmp/prev-history.json 2>/dev/null \
+              || echo '[]' > /tmp/prev-history.json
+          else
+            echo '[]' > /tmp/prev-history.json
+          fi
+
+      # Append the current run record and write history.json into the report directory
+      - name: Prepare history.json
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          NEW_ENTRY=$(jq -n \
+            --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --arg commit "${{ github.sha }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg branch "${{ github.ref_name }}" \
+            --arg conclusion "${{ job.status }}" \
+            '{
+              timestamp: $timestamp,
+              run_url: $run_url,
+              commit: $commit,
+              ref: $ref,
+              branch: $branch,
+              conclusion: $conclusion
+            }')
+          jq --argjson entry "$NEW_ENTRY" '. + [$entry]' /tmp/prev-history.json \
+            > playwright-report/history.json
+
+      # Upload the report directory as the GitHub Pages artifact
+      - name: Upload Pages artifact
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: playwright-report/
+
+      # Deploy the uploaded artifact to GitHub Pages
+      - name: Deploy to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: false
+
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
+
+      - name: Run yarn audit
+        id: audit
+        run: |
+          yarn audit --level high --json > audit-report.json 2>&1 || true
+          HIGH=$(cat audit-report.json | grep -c '"type":"auditAdvisory"' || echo 0)
+          CRITICAL=$(cat audit-report.json | grep -E '"severity":"critical"' | wc -l | tr -d ' ')
+          HIGH_COUNT=$(cat audit-report.json | grep -E '"severity":"high"' | wc -l | tr -d ' ')
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH_COUNT" >> $GITHUB_OUTPUT
+          {
+            echo "## Dependency Vulnerability Scan"
+            echo ""
+            echo "| Severity | Count |"
+            echo "| --- | --- |"
+            echo "| Critical | $CRITICAL |"
+            echo "| High | $HIGH_COUNT |"
+          } >> $GITHUB_STEP_SUMMARY
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "Vulnerabilities detected: $CRITICAL critical, $HIGH_COUNT high. Failing the job."
+            exit 1
+          fi
