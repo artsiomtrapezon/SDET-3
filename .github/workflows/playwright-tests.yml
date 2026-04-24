@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Job 1: Run tests (PRs and pushes to main) ────────────────────────────────
   playwright-tests:
     name: playwright-tests
     runs-on: ubuntu-latest
@@ -24,12 +25,6 @@ jobs:
 
     permissions:
       contents: read
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     env:
       CI: true
@@ -99,11 +94,39 @@ jobs:
               ]
             }'
 
-      # ── GitHub Pages publish (main only) ─────────────────────────────────────
+  # ── Job 2: Deploy to GitHub Pages (main only) ────────────────────────────────
+  deploy-pages:
+    name: deploy-pages
+    runs-on: ubuntu-latest
+    needs: playwright-tests
+    if: github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # Download the HTML report artifact produced by the test job
+      - name: Download HTML report
+        uses: actions/download-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report/
+
+      # Check out repository to access git history (needed for gh-pages fetch)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # Fetch history.json from the gh-pages branch if it already exists
       - name: Fetch previous run history from gh-pages
-        if: always() && github.ref == 'refs/heads/main'
         run: |
           if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
             git fetch origin gh-pages --depth=1
@@ -115,7 +138,6 @@ jobs:
 
       # Append the current run record and write history.json into the report directory
       - name: Prepare history.json
-        if: always() && github.ref == 'refs/heads/main'
         run: |
           NEW_ENTRY=$(jq -n \
             --arg timestamp "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
@@ -123,7 +145,7 @@ jobs:
             --arg commit "${{ github.sha }}" \
             --arg ref "${{ github.ref }}" \
             --arg branch "${{ github.ref_name }}" \
-            --arg conclusion "${{ job.status }}" \
+            --arg conclusion "success" \
             '{
               timestamp: $timestamp,
               run_url: $run_url,
@@ -137,14 +159,12 @@ jobs:
 
       # Upload the report directory as the GitHub Pages artifact
       - name: Upload Pages artifact
-        if: always() && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: playwright-report/
 
       # Deploy the uploaded artifact to GitHub Pages
       - name: Deploy to GitHub Pages
-        if: always() && github.ref == 'refs/heads/main'
         id: deployment
         uses: actions/deploy-pages@v4
 
