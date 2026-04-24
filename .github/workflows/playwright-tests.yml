@@ -112,18 +112,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      # Check out repository first (git clean -ffdx runs here, must be before artifact download)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       # Download the HTML report artifact produced by the test job
       - name: Download HTML report
         uses: actions/download-artifact@v4
         with:
           name: playwright-html-report
           path: playwright-report/
-
-      # Check out repository to access git history (needed for gh-pages fetch)
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       # Fetch history.json from the gh-pages branch if it already exists
       - name: Fetch previous run history from gh-pages
@@ -145,7 +145,7 @@ jobs:
             --arg commit "${{ github.sha }}" \
             --arg ref "${{ github.ref }}" \
             --arg branch "${{ github.ref_name }}" \
-            --arg conclusion "success" \
+            --arg conclusion "${{ needs.playwright-tests.result }}" \
             '{
               timestamp: $timestamp,
               run_url: $run_url,
