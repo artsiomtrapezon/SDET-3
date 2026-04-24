@@ -26,7 +26,7 @@ export class PlaywrightDevPage {
       .locator('a', { hasText: 'Page Object Model' });
     this.navDocs = page.getByRole('navigation').getByRole('link', { name: 'Docs' });
     this.navAPI = page.getByRole('navigation').getByRole('link', { name: 'API' });
-    this.navCommunity = page.locator('footer').getByText('Community', { exact: true });
+    this.navCommunity = page.locator('footer').getByText('Comunity', { exact: true });
     this.footerStackOverflow = page.locator('footer').getByRole('link', { name: 'Stack Overflow' });
     this.footerDiscord = page.locator('footer').getByRole('link', { name: 'Discord' });
     this.menuToggle = page.getByRole('button', { name: /menu|navigation|toggle/i });
