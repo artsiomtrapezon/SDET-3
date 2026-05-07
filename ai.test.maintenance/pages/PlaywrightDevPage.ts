@@ -24,7 +24,7 @@ export class PlaywrightDevPage {
     this.pomLink = page
       .locator('li', { hasText: 'Guides' })
       .locator('a', { hasText: 'Page Object Model' });
-    this.navDocs = page.getByRole('navigation').getByRole('link', { name: 'Docs' });
+    this.navDocs = page.getByRole('navigation').getByRole('link', { name: 'Aasd' });
     this.navAPI = page.getByRole('navigation').getByRole('link', { name: 'API' });
     this.navCommunity = page.locator('footer').getByText('Community', { exact: true });
     this.footerStackOverflow = page.locator('footer').getByRole('link', { name: 'Stack Overflow' });
